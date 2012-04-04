@@ -16,11 +16,16 @@ my $MOD = 'racesow';
 my $MOD_DIR = $WSW_DIR . $MOD . '/';
 my $COMMUNICATION_DIR = $MOD_DIR . 'ipc/gametype/';
 my $AVI_DIR = $MOD_DIR . 'avi/';
+my $VIDEO = 'demo.mp4';
+my $SETTINGS = '';
 my $SKIP = 2;
+my $FPS = 25;
+my $WIDTH = 384;
+my $HEIGHT = 308;
 my $LOG = 'replay';
 my $DISPLAY = 1;
 my $POLL_SCRIPT = 'replay-poll.cfg';
-my $POLL_DELAY = 0.5;
+my $POLL_DELAY = 0.2;
 my $CONSOLE_HEIGHT = 4;
 open my $out, '>', $MOD_DIR . $POLL_SCRIPT;
 print $out 'demotime' . (';echo' x $CONSOLE_HEIGHT);
@@ -36,7 +41,7 @@ my %COMMANDS = (
 
 my @files;
 get_files();
-if (@files > 0) {
+if (@files > 0 || -e $AVI_DIR . $VIDEO) {
     die 'Old footage present';
 }
 my $needs_poll = 0;
@@ -80,7 +85,7 @@ sub run_game {
     for my $cmd (keys %COMMANDS) {
         $arguments .= ' "+bind ' . $COMMANDS{$cmd}->[1] . ' ' . $COMMANDS{$cmd}->[0].'"';
     }
-    $arguments .= ' +set fs_game ' . $MOD . ' +logconsole ' . $LOG . ' +logconsole_flush 1 +demo "' . $DEMO . '"';
+    $arguments .= ' +set fs_game ' . $MOD . ' +set r_mode -1 +set vid_customwidth ' . $WIDTH . ' +set vid_customheight ' . $HEIGHT . ' +cl_demoavi_fps ' . $FPS .  ' +logconsole ' . $LOG . ' +logconsole_flush 1 ' . $SETTINGS .' +demo "' . $DEMO . '"';
     system 'xinit ' . $WSW_CMD . $arguments . ' -- :' . $DISPLAY . ' >/dev/null &';
 }
 
@@ -89,6 +94,10 @@ sub create_video {
     my @removed = splice @files, 0, $SKIP;
     for my $removed (@removed) {
         unlink $removed;
+    }
+    system 'ffmpeg -r ' . $FPS . ' -i ' . $AVI_DIR . 'avi%06d.jpg ' . $AVI_DIR . $VIDEO;
+    for my $file (@files) {
+        unlink $file;
     }
 }
 
