@@ -8,26 +8,26 @@ use autodie;
 use Time::HiRes 'time';
 use FileHandle;
 
-my $START = '60';
-my $END = '180';
-my $DEMO = 'server/test';
+my $START = '180';
+my $END = '240';
+my $DEMO = 'server/mp';
 my $WSW_CMD = '/usr/bin/warsow';
 my $WSW_DIR = '/home/hettoo/.warsow-0.6/';
-my $MOD = 'racesow';
+my $MOD = 'basewsw';
 my $MOD_DIR = $WSW_DIR . $MOD . '/';
-my $COMMUNICATION_DIR = $MOD_DIR . 'ipc/gametype/';
 my $AVI_DIR = $MOD_DIR . 'avi/';
 my $VIDEO = 'demo.mp4';
 my $SETTINGS = '';
 my $OPTIONS = '';
 my $SKIP = 2;
 my $FPS = 25;
-my $PLAYER = 0;
+my $PLAYER = 1;
 my $WIDTH = 384;
 my $HEIGHT = 308;
 my $LOG = 'replay';
 my $DISPLAY = 1;
 my $POLL_SCRIPT = 'replay-poll.cfg';
+my $BINDS_SCRIPT = 'replay-binds.cfg';
 my $POLL_DELAY = 0.2;
 my $CONSOLE_HEIGHT = 4;
 my %COMMANDS = (
@@ -50,8 +50,9 @@ sub run {
     if (-e $logfile) {
         unlink $logfile;
     }
-    run_game($shell);
+    create_binds_script();
     create_poll_script();
+    run_game($shell);
     while (!-e $logfile) {
     }
     my $needs_poll = 0;
@@ -80,6 +81,7 @@ sub run {
     say $shell 'kill %1';
     close $shell;
     unlink $MOD_DIR . $POLL_SCRIPT;
+    unlink $MOD_DIR . $BINDS_SCRIPT;
     create_video();
 }
 
@@ -90,6 +92,16 @@ sub check_old_files {
     }
 }
 
+sub create_binds_script {
+    my $binds = '';
+    for my $cmd (keys %COMMANDS) {
+        $binds .= 'bind ' . $COMMANDS{$cmd}->[1] . ' "' . $COMMANDS{$cmd}->[0].'";';
+    }
+    open my $out, '>', $MOD_DIR . $BINDS_SCRIPT;
+    print $out $binds;
+    close $out;
+}
+
 sub create_poll_script {
     open my $out, '>', $MOD_DIR . $POLL_SCRIPT;
     print $out 'demotime' . (';echo' x $CONSOLE_HEIGHT);
@@ -98,11 +110,7 @@ sub create_poll_script {
 
 sub run_game {
     my($shell) = @_;
-    my $arguments = '';
-    for my $cmd (keys %COMMANDS) {
-        $arguments .= ' "+bind ' . $COMMANDS{$cmd}->[1] . ' ' . $COMMANDS{$cmd}->[0].'"';
-    }
-    $arguments .= ' +set fs_game ' . $MOD . ' +set r_mode -1 +set vid_customwidth ' . $WIDTH . ' +set vid_customheight ' . $HEIGHT . ' +cl_demoavi_fps ' . $FPS .  ' +logconsole ' . $LOG . ' +logconsole_flush 1 +cg_showFPS 0 ' . $SETTINGS .' +demo "' . $DEMO . '"';
+    my $arguments = ' +set fs_game ' . $MOD . ' +set r_mode -1 +set vid_customwidth ' . $WIDTH . ' +set vid_customheight ' . $HEIGHT . ' +cl_demoavi_fps ' . $FPS .  ' +logconsole ' . $LOG . ' +logconsole_flush 1 +exec ' . $BINDS_SCRIPT . ' +cg_showFPS 0 ' . $SETTINGS .' +demo "' . $DEMO . '"';
     say $shell 'xinit ' . $WSW_CMD . $arguments . ' -- :' . $DISPLAY . ' >/dev/null &';
 }
 
@@ -134,8 +142,9 @@ sub filter {
 
 sub process {
     my($line) = @_;
-    print $line . "\n";
+    say $line;
     state $started = 0;
+    state $switched = 0;
     state $stopped = 0;
     if ($stopped) {
         return 0;
@@ -144,9 +153,6 @@ sub process {
         if (!$started) {
             issue_command('pause');
             issue_command('jump');
-            for (my $i = 0; $i < $PLAYER; $i++) {
-                issue_command('next');
-            }
             issue_command('pause');
             issue_command('start');
             $started = 1;
@@ -155,6 +161,12 @@ sub process {
                 issue_command('stop');
                 $stopped = 1;
             } else {
+                if (!$switched) {
+                    for (0 .. $PLAYER - 1) {
+                        issue_command('next');
+                    }
+                    $switched = 1;
+                }
                 return 1;
             }
         }
