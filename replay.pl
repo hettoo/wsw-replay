@@ -6,7 +6,7 @@ use feature qw(switch state say);
 
 use autodie;
 use Time::HiRes 'time';
-use FileHandle;
+use File::Copy;
 
 my $START = '180';
 my $END = '240';
@@ -19,7 +19,7 @@ my $AVI_DIR = $MOD_DIR . 'avi/';
 my $VIDEO = 'demo.mp4';
 my $SETTINGS = '';
 my $OPTIONS = '';
-my $SKIP = 2;
+my $SKIP = 7;
 my $FPS = 25;
 my $PLAYER = 1;
 my $WIDTH = 384;
@@ -116,15 +116,18 @@ sub run_game {
 
 sub create_video {
     my @files = get_files();
-    my @removed = splice @files, 0, $SKIP;
+    for my $i (0 .. $#files - $SKIP) {
+        move($files[$i + $SKIP], $files[$i]);
+    }
+    @files = get_files();
     my $wanted = $FPS * ($END - $START);
     if ($wanted < @files) {
-        push @removed, splice @files, int $wanted + 0.5;
+        my @removed = splice @files, int $wanted + 0.5;
+        for my $removed (@removed) {
+            unlink $removed;
+        }
     }
-    for my $removed (@removed) {
-        unlink $removed;
-    }
-    system 'ffmpeg -r ' . $FPS . ' -i ' . $OPTIONS . ' ' . $AVI_DIR . 'avi%06d.jpg ' . $AVI_DIR . $VIDEO;
+    system 'ffmpeg -r ' . $FPS . ' ' . $OPTIONS . ' -i ' . $AVI_DIR . 'avi%06d.jpg ' . $AVI_DIR . $VIDEO;
     for my $file (@files) {
         unlink $file;
     }
@@ -142,7 +145,6 @@ sub filter {
 
 sub process {
     my($line) = @_;
-    say $line;
     state $started = 0;
     state $switched = 0;
     state $stopped = 0;
