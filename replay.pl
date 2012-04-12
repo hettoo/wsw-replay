@@ -21,7 +21,6 @@ my $SETTINGS = '';
 my $OPTIONS = '';
 my $SKIP = 7;
 my $FPS = 25;
-my $PLAYER = 1;
 my $WIDTH = 384;
 my $HEIGHT = 308;
 my $LOG = 'replay';
@@ -32,9 +31,8 @@ my $POLL_DELAY = 0.2;
 my $CONSOLE_HEIGHT = 4;
 my %COMMANDS = (
     'pause' => ['demopause', 'h'],
-    'next' => ['+moveup', 'i'],
-    'jump' => , ['demojump ' . $START, 'j'],
-    'start' => ['demoavi', 'k'],
+    'jump' => , ['demojump ' . $START, 'i'],
+    'start' => ['demoavi', 'j'],
     'poll' => ['exec ' . $POLL_SCRIPT . ' silent', 'l'],
     'stop' => ['quit', 'm']
 );
@@ -95,7 +93,8 @@ sub check_old_files {
 sub create_binds_script {
     my $binds = '';
     for my $cmd (keys %COMMANDS) {
-        $binds .= 'bind ' . $COMMANDS{$cmd}->[1] . ' "' . $COMMANDS{$cmd}->[0].'";';
+        $binds .= 'bind ' . $COMMANDS{$cmd}->[1]
+            . ' "' . $COMMANDS{$cmd}->[0].'";';
     }
     open my $out, '>', $MOD_DIR . $BINDS_SCRIPT;
     print $out $binds;
@@ -110,8 +109,19 @@ sub create_poll_script {
 
 sub run_game {
     my($shell) = @_;
-    my $arguments = ' +set fs_game ' . $MOD . ' +set r_mode -1 +set vid_customwidth ' . $WIDTH . ' +set vid_customheight ' . $HEIGHT . ' +cl_demoavi_fps ' . $FPS .  ' +logconsole ' . $LOG . ' +logconsole_flush 1 +exec ' . $BINDS_SCRIPT . ' +cg_showFPS 0 ' . $SETTINGS .' +demo "' . $DEMO . '"';
-    say $shell 'xinit ' . $WSW_CMD . $arguments . ' -- :' . $DISPLAY . ' >/dev/null &';
+    my $arguments = ' +set fs_game ' . $MOD
+        . ' +set r_mode -1'
+        . ' +set vid_customwidth ' . $WIDTH
+        . ' +set vid_customheight ' . $HEIGHT
+        . ' +set cl_demoavi_fps ' . $FPS
+        . ' +set logconsole ' . $LOG
+        . ' +set logconsole_flush 1'
+        . ' +set cg_showFPS 0 '
+        . ' +exec ' . $BINDS_SCRIPT
+        . $SETTINGS
+        . ' +demo "' . $DEMO . '"';
+    say $shell 'xinit ' . $WSW_CMD . $arguments . ' -- :' . $DISPLAY
+        . ' >/dev/null &';
 }
 
 sub create_video {
@@ -127,7 +137,8 @@ sub create_video {
             unlink $removed;
         }
     }
-    system 'ffmpeg -r ' . $FPS . ' ' . $OPTIONS . ' -i ' . $AVI_DIR . 'avi%06d.jpg ' . $AVI_DIR . $VIDEO;
+    system 'ffmpeg -r ' . $FPS . ' ' . $OPTIONS
+        . ' -i ' . $AVI_DIR . 'avi%06d.jpg ' . $AVI_DIR . $VIDEO;
     for my $file (@files) {
         unlink $file;
     }
@@ -146,7 +157,6 @@ sub filter {
 sub process {
     my($line) = @_;
     state $started = 0;
-    state $switched = 0;
     state $stopped = 0;
     if ($stopped) {
         return 0;
@@ -163,12 +173,6 @@ sub process {
                 issue_command('stop');
                 $stopped = 1;
             } else {
-                if (!$switched) {
-                    for (0 .. $PLAYER - 1) {
-                        issue_command('next');
-                    }
-                    $switched = 1;
-                }
                 return 1;
             }
         }
