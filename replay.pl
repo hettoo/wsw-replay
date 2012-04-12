@@ -134,7 +134,7 @@ sub run {
 sub check_old_files {
     my @files = get_files();
     if (@files > 0 || -e $AVI_DIR . $VIDEO || -e $AVI_DIR . $AUDIO) {
-        die 'Old footage present';
+        die "Old footage present\n";
     }
 }
 
@@ -248,7 +248,9 @@ sub create_video {
     for my $file (@files) {
         unlink $file;
     }
-    unlink $AVI_DIR . $AUDIO;
+    if ($audio) {
+        unlink $AVI_DIR . $AUDIO;
+    }
 }
 
 sub filter {
