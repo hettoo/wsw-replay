@@ -23,7 +23,7 @@ my $mod = 'basewsw';
 my $game_settings = '';
 my $video_settings = '';
 my $skip = 7;
-my $fps = 25;
+my $fps = 50;
 my $width = 1280;
 my $height = 720;
 my $display = 1;
@@ -98,11 +98,15 @@ sub set_constants {
 }
 
 sub test_dependencies {
+    my $fail = '';
     for my $dependency (@DEPENDENCIES) {
         if ((substr $dependency, 0, 1 eq '/' && !-e $dependency)
             || system 'which ' . $dependency . ' &>/dev/null') {
-            die 'Dependency ' . $dependency . " not found\n";
+            $fail .= 'Dependency ' . $dependency . ' not found' . "\n";
         }
+    }
+    if ($fail ne '') {
+        die $fail;
     }
 }
 
