@@ -8,37 +8,58 @@ use autodie;
 use Time::HiRes 'time';
 use File::Copy;
 
-my $START = '180';
-my $END = '240';
-my $DEMO = 'server/mp';
-my $WSW_CMD = '/usr/bin/warsow';
-my $WSW_DIR = '/home/hettoo/.warsow-0.6/';
-my $MOD = 'basewsw';
-my $MOD_DIR = $WSW_DIR . $MOD . '/';
+my $start = '180';
+my $end = '240';
+my $demo = 'server/mp';
+my $game_cmd = '/usr/bin/warsow';
+my $game_dir = $ENV{'HOME'} . '/.warsow-0.6/';
+my $mod = 'basewsw';
+my $game_settings = '';
+my $video_settings = '';
+my $skip = 7;
+my $fps = 25;
+my $width = 384;
+my $height = 308;
+my $display = 1;
+
+my $NAME = 'replay';
+my $MOD_DIR = $game_dir . $mod . '/';
 my $AVI_DIR = $MOD_DIR . 'avi/';
-my $VIDEO = 'demo.mp4';
-my $SETTINGS = '';
-my $OPTIONS = '';
-my $SKIP = 7;
-my $FPS = 25;
-my $WIDTH = 384;
-my $HEIGHT = 308;
-my $LOG = 'replay';
-my $DISPLAY = 1;
-my $POLL_SCRIPT = 'replay-poll.cfg';
-my $BINDS_SCRIPT = 'replay-binds.cfg';
-my $POLL_DELAY = 0.2;
+my $LOG = $NAME;
+my $POLL_DELAY = 0.5;
 my $CONSOLE_HEIGHT = 4;
+my $VIDEO = 'demo.mp4';
+my $POLL_SCRIPT = $NAME . '-poll.cfg';
+my $BINDS_SCRIPT = $NAME . '-binds.cfg';
 my %COMMANDS = (
     'pause' => ['demopause', 'h'],
-    'jump' => , ['demojump ' . $START, 'i'],
+    'jump' => , ['demojump ' . $start, 'i'],
     'start' => ['demoavi', 'j'],
     'poll' => ['exec ' . $POLL_SCRIPT . ' silent', 'l'],
     'stop' => ['quit', 'm']
 );
+my @DEPENDENCIES = ($game_cmd, 'xinit', 'xdotool', 'ffmpeg');
 
+test_dependencies();
+read_options();
+check_options();
 run();
 exit;
+
+sub test_dependencies {
+    for my $dependency (@DEPENDENCIES) {
+        if ((substr $dependency, 0, 1 eq '/' && !-e $dependency)
+            || system 'which ' . $dependency . ' &>/dev/null') {
+            die 'Dependency ' . $dependency . " not found\n";
+        }
+    }
+}
+
+sub read_options {
+}
+
+sub check_options {
+}
 
 sub run {
     open my $shell, '|-', 'bash';
@@ -109,35 +130,35 @@ sub create_poll_script {
 
 sub run_game {
     my($shell) = @_;
-    my $arguments = ' +set fs_game ' . $MOD
+    my $arguments = ' +set fs_game ' . $mod
         . ' +set r_mode -1'
-        . ' +set vid_customwidth ' . $WIDTH
-        . ' +set vid_customheight ' . $HEIGHT
-        . ' +set cl_demoavi_fps ' . $FPS
+        . ' +set vid_customwidth ' . $width
+        . ' +set vid_customheight ' . $height
+        . ' +set cl_demoavi_fps ' . $fps
         . ' +set logconsole ' . $LOG
         . ' +set logconsole_flush 1'
         . ' +set cg_showFPS 0 '
         . ' +exec ' . $BINDS_SCRIPT
-        . $SETTINGS
-        . ' +demo "' . $DEMO . '"';
-    say $shell 'xinit ' . $WSW_CMD . $arguments . ' -- :' . $DISPLAY
+        . $game_settings
+        . ' +demo "' . $demo . '"';
+    say $shell 'xinit ' . $game_cmd . $arguments . ' -- :' . $display
         . ' >/dev/null &';
 }
 
 sub create_video {
     my @files = get_files();
-    for my $i (0 .. $#files - $SKIP) {
-        move($files[$i + $SKIP], $files[$i]);
+    for my $i (0 .. $#files - $skip) {
+        move($files[$i + $skip], $files[$i]);
     }
     @files = get_files();
-    my $wanted = $FPS * ($END - $START);
+    my $wanted = $fps * ($end - $start);
     if ($wanted < @files) {
         my @removed = splice @files, int $wanted + 0.5;
         for my $removed (@removed) {
             unlink $removed;
         }
     }
-    system 'ffmpeg -r ' . $FPS . ' ' . $OPTIONS
+    system 'ffmpeg -r ' . $fps . ' ' . $video_settings
         . ' -i ' . $AVI_DIR . 'avi%06d.jpg ' . $AVI_DIR . $VIDEO;
     for my $file (@files) {
         unlink $file;
@@ -169,7 +190,7 @@ sub process {
             issue_command('start');
             $started = 1;
         } else {
-            if ($1 >= $END) {
+            if ($1 >= $end) {
                 issue_command('stop');
                 $stopped = 1;
             } else {
@@ -184,7 +205,7 @@ sub process {
 
 sub issue_command {
     my($command) = @_;
-    system 'DISPLAY=:' . $DISPLAY . ' xdotool key ' . $COMMANDS{$command}->[1];
+    system 'DISPLAY=:' . $display . ' xdotool key ' . $COMMANDS{$command}->[1];
 }
 
 sub get_files {
