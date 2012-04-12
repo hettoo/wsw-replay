@@ -5,12 +5,18 @@ use warnings;
 use feature qw(switch state say);
 
 use autodie;
+use Getopt::Long;
 use Time::HiRes 'time';
 use File::Copy;
 
-my $start = '180';
-my $end = '240';
-my $demo = 'server/mp';
+my(
+    $NAME, $MOD_DIR, $AVI_DIR, $LOG, $POLL_DELAY, $CONSOLE_HEIGHT, $VIDEO,
+    $POLL_SCRIPT, $BINDS_SCRIPT, %COMMANDS, @DEPENDENCIES
+);
+
+my $demo;
+my $start = 0;
+my $end = 0;
 my $game_cmd = '/usr/bin/warsow';
 my $game_dir = $ENV{'HOME'} . '/.warsow-0.6/';
 my $mod = 'basewsw';
@@ -18,33 +24,78 @@ my $game_settings = '';
 my $video_settings = '';
 my $skip = 7;
 my $fps = 25;
-my $width = 384;
-my $height = 308;
+my $width = 1280;
+my $height = 720;
 my $display = 1;
 
-my $NAME = 'replay';
-my $MOD_DIR = $game_dir . $mod . '/';
-my $AVI_DIR = $MOD_DIR . 'avi/';
-my $LOG = $NAME;
-my $POLL_DELAY = 0.5;
-my $CONSOLE_HEIGHT = 4;
-my $VIDEO = 'demo.mp4';
-my $POLL_SCRIPT = $NAME . '-poll.cfg';
-my $BINDS_SCRIPT = $NAME . '-binds.cfg';
-my %COMMANDS = (
-    'pause' => ['demopause', 'h'],
-    'jump' => , ['demojump ' . $start, 'i'],
-    'start' => ['demoavi', 'j'],
-    'poll' => ['exec ' . $POLL_SCRIPT . ' silent', 'l'],
-    'stop' => ['quit', 'm']
-);
-my @DEPENDENCIES = ($game_cmd, 'xinit', 'xdotool', 'ffmpeg');
-
+get_options();
+set_constants();
 test_dependencies();
-read_options();
-check_options();
 run();
 exit;
+
+sub get_options {
+    GetOptions(
+        'start=i' => \$start,
+        'end=i' => \$end,
+        'game=s' => \$game_cmd,
+        'dir=s' => \$game_dir,
+        'mod=s' => \$mod,
+        'game-settings=s' => \$game_settings,
+        'video-settings=s' => \$video_settings,
+        'skip=i' => \$skip,
+        'fps=i' => \$fps,
+        'width=i' => \$width,
+        'height=i' => \$height,
+        'display=i' => \$display,
+        'help' => \&help
+    );
+    if (@ARGV == 1) {
+        $demo = $ARGV[0];
+    } else {
+        help();
+    }
+}
+
+sub help {
+    say 'Usage: ' . $0 . ' [OPTION]... demo';
+    say 'Render a (Warsow) game demo.';
+    say '';
+    say '  --start=SECOND              set the start second';
+    say '  --end=SECOND                set the end second';
+    say '  --game=COMMAND              set the game command';
+    say '  --dir=DIR                   set the game directory (for this user)';
+    say '  --mod=MOD                   set the game mod';
+    say '  --game-settings=SETTINGS    set additional game settings';
+    say '  --video-settings=SETTINGS   set additional video settings';
+    say '  --skip=FRAMES               remove the first FRAMES frames';
+    say '  --fps=FPS                   set the fps';
+    say '  --width=PIXELS              set the width';
+    say '  --height=PIXELS             set the height';
+    say '  --display=DISPLAY           set the X display to use';
+    say '  --help                      display this help and exit';
+    exit;
+}
+
+sub set_constants {
+    $NAME = 'replay';
+    $MOD_DIR = $game_dir . $mod . '/';
+    $AVI_DIR = $MOD_DIR . 'avi/';
+    $LOG = $NAME;
+    $POLL_DELAY = 0.5;
+    $CONSOLE_HEIGHT = 4;
+    $VIDEO = 'demo.mp4';
+    $POLL_SCRIPT = $NAME . '-poll.cfg';
+    $BINDS_SCRIPT = $NAME . '-binds.cfg';
+    %COMMANDS = (
+        'pause' => ['demopause', 'h'],
+        'jump' => , ['demojump ' . $start, 'i'],
+        'start' => ['demoavi', 'j'],
+        'poll' => ['exec ' . $POLL_SCRIPT . ' silent', 'l'],
+        'stop' => ['quit', 'm']
+    );
+    @DEPENDENCIES = ($game_cmd, 'xinit', 'xdotool', 'ffmpeg');
+}
 
 sub test_dependencies {
     for my $dependency (@DEPENDENCIES) {
@@ -53,12 +104,6 @@ sub test_dependencies {
             die 'Dependency ' . $dependency . " not found\n";
         }
     }
-}
-
-sub read_options {
-}
-
-sub check_options {
 }
 
 sub run {
@@ -151,11 +196,13 @@ sub create_video {
         move($files[$i + $skip], $files[$i]);
     }
     @files = get_files();
-    my $wanted = $fps * ($end - $start);
-    if ($wanted < @files) {
-        my @removed = splice @files, int $wanted + 0.5;
-        for my $removed (@removed) {
-            unlink $removed;
+    if ($end > 0) {
+        my $wanted = $fps * ($end - $start);
+        if ($wanted < @files) {
+            my @removed = splice @files, int $wanted + 0.5;
+            for my $removed (@removed) {
+                unlink $removed;
+            }
         }
     }
     system 'ffmpeg -r ' . $fps . ' ' . $video_settings
@@ -190,7 +237,7 @@ sub process {
             issue_command('start');
             $started = 1;
         } else {
-            if ($1 >= $end) {
+            if ($end > 0 && $1 >= $end) {
                 issue_command('stop');
                 $stopped = 1;
             } else {
