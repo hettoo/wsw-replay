@@ -2,7 +2,7 @@
 
 use strict;
 use warnings;
-use feature qw(switch state say);
+use feature qw(switch say);
 
 use autodie;
 use Getopt::Long;
@@ -10,19 +10,20 @@ use Time::HiRes 'time';
 use File::Copy;
 
 my(
-    $NAME, $MOD_DIR, $AVI_DIR, $LOG, $POLL_DELAY, $CONSOLE_HEIGHT, $VIDEO,
-    $POLL_SCRIPT, $BINDS_SCRIPT, %COMMANDS, @DEPENDENCIES
+    $NAME, $MOD_DIR, $AVI_DIR, $LOG, $POLL_DELAY, $CONSOLE_HEIGHT,
+    $VIDEO, $AUDIO, $POLL_SCRIPT, $BINDS_SCRIPT, %COMMANDS, @DEPENDENCIES
 );
 
 my $demo;
 my $start = 0;
 my $end = 0;
+my $audio = 0;
 my $game_cmd = '/usr/bin/warsow';
 my $game_dir = $ENV{'HOME'} . '/.warsow-0.6/';
 my $mod = 'basewsw';
 my $game_settings = '';
 my $video_settings = '';
-my $skip = 7;
+my $skip = 0;
 my $fps = 50;
 my $width = 1280;
 my $height = 720;
@@ -38,6 +39,7 @@ sub get_options {
     GetOptions(
         'start=i' => \$start,
         'end=i' => \$end,
+        'audio' => \$audio,
         'game=s' => \$game_cmd,
         'dir=s' => \$game_dir,
         'mod=s' => \$mod,
@@ -59,10 +61,11 @@ sub get_options {
 
 sub help {
     say 'Usage: ' . $0 . ' [OPTION]... demo';
-    say 'Render a (Warsow) game demo.';
+    say 'Render a Warsow game demo.';
     say '';
     say '  --start=SECOND              set the start second';
     say '  --end=SECOND                set the end second';
+    say '  --audio                     also render audio';
     say '  --game=COMMAND              set the game command';
     say '  --dir=DIR                   set the game directory (for this user)';
     say '  --mod=MOD                   set the game mod';
@@ -85,6 +88,7 @@ sub set_constants {
     $POLL_DELAY = 0.5;
     $CONSOLE_HEIGHT = 4;
     $VIDEO = 'demo.mp4';
+    $AUDIO = 'wavdump.wav';
     $POLL_SCRIPT = $NAME . '-poll.cfg';
     $BINDS_SCRIPT = $NAME . '-binds.cfg';
     %COMMANDS = (
@@ -114,39 +118,13 @@ sub run {
     open my $shell, '|-', 'bash';
     $shell->autoflush(1);
     check_old_files();
-    my $logfile = $MOD_DIR . $LOG . '.log';
-    if (-e $logfile) {
-        unlink $logfile;
-    }
     create_binds_script();
     create_poll_script();
-    run_game($shell);
-    while (!-e $logfile) {
+    get_images($shell);
+    if ($audio) {
+        flush_jobs($shell);
+        get_audio($shell);
     }
-    my $needs_poll = 0;
-    my $poll_time = 0;
-    open my $log, '<', $logfile;
-    my $line;
-    do {
-        my $pos = tell $log;
-        $line = <$log>;
-        if (defined $line && $line =~ /\R$/) {
-            $line = filter($line);
-            if (process($line)) {
-                $needs_poll = 1;
-            }
-        } else {
-            seek $log, $pos, 0;
-        }
-        if ($needs_poll) {
-            if (time >= $poll_time + $POLL_DELAY) {
-                issue_command('poll');
-                $poll_time = time;
-            }
-        }
-    } while (!defined $line || $line ne 'Demo completed');
-    close $log;
-    say $shell 'kill %1';
     close $shell;
     unlink $MOD_DIR . $POLL_SCRIPT;
     unlink $MOD_DIR . $BINDS_SCRIPT;
@@ -155,7 +133,7 @@ sub run {
 
 sub check_old_files {
     my @files = get_files();
-    if (@files > 0 || -e $AVI_DIR . $VIDEO) {
+    if (@files > 0 || -e $AVI_DIR . $VIDEO || -e $AVI_DIR . $AUDIO) {
         die 'Old footage present';
     }
 }
@@ -177,8 +155,61 @@ sub create_poll_script {
     close $out;
 }
 
-sub run_game {
+sub get_images {
     my($shell) = @_;
+    run_game_wrapped($shell, '+set cl_demoavi_video 1 +set cl_demoavi_audio 0'
+        . ' +set r_screenshot_jpeg 1');
+}
+
+sub get_audio {
+    my($shell) = @_;
+    run_game_wrapped($shell, '+set cl_demoavi_video 0 +set cl_demoavi_audio 1'
+        . ' +set s_module 1');
+}
+
+sub flush_jobs {
+    my($shell) = @_;
+    say $shell 'while kill `jobs -p` >/dev/null; do true; done;';
+}
+
+sub run_game_wrapped {
+    my($shell, $extra_settings) = @_;
+    my $logfile = $MOD_DIR . $LOG . '.log';
+    if (-e $logfile) {
+        unlink $logfile;
+    }
+    run_game($shell, $extra_settings);
+    while (!-e $logfile) {
+    }
+    my $started = 0;
+    my $stopped = 0;
+    my $needs_poll = 0;
+    my $poll_time = 0;
+    open my $log, '<', $logfile;
+    my $line;
+    do {
+        my $pos = tell $log;
+        $line = <$log>;
+        if (defined $line && $line =~ /\R$/) {
+            $line = filter($line);
+            process($line, \$started, \$stopped, \$needs_poll);
+        } else {
+            seek $log, $pos, 0;
+        }
+        if ($needs_poll) {
+            if (time >= $poll_time + $POLL_DELAY) {
+                issue_command('poll');
+                $poll_time = time;
+                $needs_poll = 0;
+            }
+        }
+    } while (!defined $line || $line ne 'Demo completed');
+    close $log;
+    say $shell 'kill `jobs -p`';
+}
+
+sub run_game {
+    my($shell, $extra_settings) = @_;
     my $arguments = ' +set fs_game ' . $mod
         . ' +set r_mode -1'
         . ' +set vid_customwidth ' . $width
@@ -188,7 +219,8 @@ sub run_game {
         . ' +set logconsole_flush 1'
         . ' +set cg_showFPS 0 '
         . ' +exec ' . $BINDS_SCRIPT
-        . $game_settings
+        . ' ' . $extra_settings
+        . ' ' . $game_settings
         . ' +demo "' . $demo . '"';
     say $shell 'xinit ' . $game_cmd . $arguments . ' -- :' . $display
         . ' >/dev/null &';
@@ -210,10 +242,13 @@ sub create_video {
         }
     }
     system 'ffmpeg -r ' . $fps . ' ' . $video_settings
-        . ' -i ' . $AVI_DIR . 'avi%06d.jpg ' . $AVI_DIR . $VIDEO;
+        . ' -i ' . $AVI_DIR . 'avi%06d.jpg '
+        . ($audio ? '-i ' . $AVI_DIR . $AUDIO . ' -acodec libmp3lame ' : '')
+        . $AVI_DIR . $VIDEO;
     for my $file (@files) {
         unlink $file;
     }
+    unlink $AVI_DIR . $AUDIO;
 }
 
 sub filter {
@@ -227,31 +262,28 @@ sub filter {
 }
 
 sub process {
-    my($line) = @_;
-    state $started = 0;
-    state $stopped = 0;
-    if ($stopped) {
-        return 0;
+    my($line, $started, $stopped, $needs_poll) = @_;
+    if (${$stopped}) {
+        return;
     }
     if ($line =~ /"demotime" is "(\d+)"/) {
-        if (!$started) {
+        if (!${$started}) {
             issue_command('pause');
             issue_command('jump');
             issue_command('pause');
             issue_command('start');
-            $started = 1;
+            ${$started} = 1;
         } else {
             if ($end > 0 && $1 >= $end) {
                 issue_command('stop');
-                $stopped = 1;
+                ${$stopped} = 1;
             } else {
-                return 1;
+                ${$needs_poll} = 1;
             }
         }
     } else {
-        return 1;
+        ${$needs_poll} = 1;
     }
-    return 0;
 }
 
 sub issue_command {
