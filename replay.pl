@@ -6,6 +6,7 @@ use feature qw(switch say);
 
 use autodie;
 use Getopt::Long;
+use POSIX 'ceil';
 use Time::HiRes 'time';
 use File::Copy;
 
@@ -28,6 +29,8 @@ my $fps = 50;
 my $width = 1280;
 my $height = 720;
 my $display = 1;
+
+my $shell;
 
 get_options();
 set_constants();
@@ -108,7 +111,7 @@ sub test_dependencies {
     for my $dependency (@DEPENDENCIES) {
         if ((substr $dependency, 0, 1 eq '/' && !-e $dependency)
             || system 'which ' . $dependency . ' &>/dev/null') {
-            $fail .= 'Dependency ' . $dependency . ' not found' . "\n";
+            $fail .= "Dependency $dependency not found\n";
         }
     }
     if ($fail ne '') {
@@ -117,15 +120,15 @@ sub test_dependencies {
 }
 
 sub run {
-    open my $shell, '|-', 'bash';
+    open $shell, '|-', 'bash';
     $shell->autoflush(1);
     check_old_files();
     create_binds_script();
     create_poll_script();
-    get_images($shell);
+    get_images();
     if ($audio) {
-        flush_jobs($shell);
-        get_audio($shell);
+        flush_jobs();
+        get_audio();
     }
     close $shell;
     unlink $MOD_DIR . $POLL_SCRIPT;
@@ -158,29 +161,26 @@ sub create_poll_script {
 }
 
 sub get_images {
-    my($shell) = @_;
-    run_game_wrapped($shell, '+set cl_demoavi_video 1 +set cl_demoavi_audio 0'
+    run_game_wrapped('+set cl_demoavi_video 1 +set cl_demoavi_audio 0'
         . ' +set r_screenshot_jpeg 1', 0);
 }
 
 sub get_audio {
-    my($shell) = @_;
-    run_game_wrapped($shell, '+set cl_demoavi_video 0 +set cl_demoavi_audio 1'
+    run_game_wrapped('+set cl_demoavi_video 0 +set cl_demoavi_audio 1'
         . ' +set s_module 1', 1);
 }
 
 sub flush_jobs {
-    my($shell) = @_;
-    say $shell 'while kill `jobs -p` &>/dev/null; do true; done;';
+    say $shell 'while kill `jobs -p` &>/dev/null; do true; done';
 }
 
 sub run_game_wrapped {
-    my($shell, $extra_settings, $preskip) = @_;
+    my($extra_settings, $preskip) = @_;
     my $logfile = $MOD_DIR . $LOG . '.log';
     if (-e $logfile) {
         unlink $logfile;
     }
-    run_game($shell, $extra_settings);
+    run_game($extra_settings);
     while (!-e $logfile) { }
     my $started = 0;
     my $stopped = 0;
@@ -194,7 +194,7 @@ sub run_game_wrapped {
         if (defined $line && $line =~ /\R$/) {
             $line = filter($line);
             if ($line =~ /^ERROR: (.+)/) {
-                flush_jobs($shell);
+                flush_jobs();
                 die "Warsow error: $1\n";
             }
             process($line, \$started, \$stopped, \$needs_poll, $preskip);
@@ -214,7 +214,7 @@ sub run_game_wrapped {
 }
 
 sub run_game {
-    my($shell, $extra_settings) = @_;
+    my($extra_settings) = @_;
     my $arguments = ' +set fs_game ' . $mod
         . ' +set r_mode -1'
         . ' +set vid_customwidth ' . $width
@@ -236,7 +236,7 @@ sub create_video {
     if ($end > 0) {
         my $wanted = $fps * ($end - $start);
         if ($wanted < @files) {
-            my @removed = splice @files, int $wanted + 0.5;
+            my @removed = splice @files, ceil $wanted;
             for my $removed (@removed) {
                 unlink $removed;
             }
@@ -246,10 +246,11 @@ sub create_video {
         move($files[$i + $skip], $files[$i]);
     }
     splice @files, @files - $skip;
-    system 'ffmpeg -r ' . $fps . ' ' . $video_settings
-        . ' -i ' . $AVI_DIR . 'avi%06d.jpg '
-        . ($audio ? '-i ' . $AVI_DIR . $AUDIO . ' -acodec libmp3lame ' : '')
-        . $AVI_DIR . $VIDEO;
+    system 'ffmpeg -r ' . $fps
+        . ' -i ' . $AVI_DIR . 'avi%06d.jpg'
+        . ($audio ? ' -i ' . $AVI_DIR . $AUDIO . ' -acodec libmp3lame' : '')
+        . ' ' . $video_settings
+        . ' ' . $AVI_DIR . $VIDEO;
     for my $file (@files) {
         unlink $file;
     }
