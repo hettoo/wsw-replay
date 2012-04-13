@@ -171,7 +171,7 @@ sub get_audio {
 
 sub flush_jobs {
     my($shell) = @_;
-    say $shell 'while kill `jobs -p` >/dev/null; do true; done;';
+    say $shell 'while kill `jobs -p` &>/dev/null; do true; done;';
 }
 
 sub run_game_wrapped {
@@ -181,8 +181,7 @@ sub run_game_wrapped {
         unlink $logfile;
     }
     run_game($shell, $extra_settings);
-    while (!-e $logfile) {
-    }
+    while (!-e $logfile) { }
     my $started = 0;
     my $stopped = 0;
     my $needs_poll = 0;
@@ -194,6 +193,10 @@ sub run_game_wrapped {
         $line = <$log>;
         if (defined $line && $line =~ /\R$/) {
             $line = filter($line);
+            if ($line =~ /^ERROR: (.+)/) {
+                flush_jobs($shell);
+                die "Warsow error: $1\n";
+            }
             process($line, \$started, \$stopped, \$needs_poll, $preskip);
         } else {
             seek $log, $pos, 0;
