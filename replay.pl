@@ -37,8 +37,8 @@ exit;
 
 sub get_options {
     GetOptions(
-        'start=i' => \$start,
-        'end=i' => \$end,
+        'start=f' => \$start,
+        'end=f' => \$end,
         'audio' => \$audio,
         'game=s' => \$game_cmd,
         'dir=s' => \$game_dir,
@@ -63,19 +63,20 @@ sub help {
     say 'Usage: ' . $0 . ' [OPTION]... demo';
     say 'Render a Warsow game demo.';
     say '';
-    say '  --start=SECOND              set the start second';
-    say '  --end=SECOND                set the end second';
+    say '  --start=SECOND              start at second SECOND';
+    say '  --end=SECOND                end at second SECOND';
     say '  --audio                     also render audio';
-    say '  --game=COMMAND              set the game command';
-    say '  --dir=DIR                   set the game directory (for this user)';
-    say '  --mod=MOD                   set the game mod';
-    say '  --game-settings=SETTINGS    set additional game settings';
-    say '  --video-settings=SETTINGS   set additional video settings';
+    say '  --game=COMMAND              set the game executable to COMMAND';
+    say '  --dir=DIR                   set the game directory (for this user)'
+        . ' to DIR';
+    say '  --mod=MOD                   set the game mod to MOD';
+    say '  --game-settings=SETTINGS    set additional game settings SETTINGS';
+    say '  --video-settings=SETTINGS   set additional ffmpeg settings SETTINGS';
     say '  --skip=FRAMES               remove the first FRAMES frames';
-    say '  --fps=FPS                   set the fps';
-    say '  --width=PIXELS              set the width';
-    say '  --height=PIXELS             set the height';
-    say '  --display=DISPLAY           set the X display to use';
+    say '  --fps=FPS                   render at FPS fps';
+    say '  --width=PIXELS              render with a width of PIXELS';
+    say '  --height=PIXELS             render with a height of PIXELS';
+    say '  --display=DISPLAY           use X display DISPLAY';
     say '  --help                      display this help and exit';
     exit;
 }
