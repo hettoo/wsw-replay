@@ -193,7 +193,8 @@ sub run_game_wrapped {
         $line = <$log>;
         if (defined $line && $line =~ /\R$/) {
             $line = filter($line);
-            if ($line =~ /^ERROR: (.+)/) {
+            if ($line =~ /^error: (.+)/i
+                || $line =~ /(no valid demo file found)/i) {
                 flush_jobs();
                 die "Warsow error: $1\n";
             }
@@ -236,7 +237,7 @@ sub create_video {
     if ($end > 0) {
         my $wanted = $fps * ($end - $start);
         if ($wanted < @files) {
-            my @removed = splice @files, ceil $wanted;
+            my @removed = splice @files, ceil($wanted);
             for my $removed (@removed) {
                 unlink $removed;
             }
