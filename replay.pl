@@ -229,7 +229,7 @@ sub run_game {
         . ' ' . $game_settings
         . ' +demo "' . $demo . '"';
     say $shell 'xinit ' . $game_cmd . $arguments . ' -- :' . $display
-        . ' >/dev/null &';
+        . ' &>/dev/null &';
 }
 
 sub create_video {
