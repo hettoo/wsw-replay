@@ -94,9 +94,10 @@ sub set_constants {
     %COMMANDS = (
         'pause' => ['demopause', 'h'],
         'jump' => , ['demojump ' . $start, 'i'],
-        'start' => ['demoavi', 'j'],
-        'poll' => ['exec ' . $POLL_SCRIPT . ' silent', 'l'],
-        'stop' => ['quit', 'm']
+        'jump-preskip' => , ['demojump ' . ($start + $skip / $fps), 'j'],
+        'start' => ['demoavi', 'l'],
+        'poll' => ['exec ' . $POLL_SCRIPT . ' silent', 'm'],
+        'stop' => ['quit', 'o']
     );
     @DEPENDENCIES = ($game_cmd, 'xinit', 'xdotool', 'ffmpeg');
 }
@@ -158,13 +159,13 @@ sub create_poll_script {
 sub get_images {
     my($shell) = @_;
     run_game_wrapped($shell, '+set cl_demoavi_video 1 +set cl_demoavi_audio 0'
-        . ' +set r_screenshot_jpeg 1');
+        . ' +set r_screenshot_jpeg 1', 0);
 }
 
 sub get_audio {
     my($shell) = @_;
     run_game_wrapped($shell, '+set cl_demoavi_video 0 +set cl_demoavi_audio 1'
-        . ' +set s_module 1');
+        . ' +set s_module 1', 1);
 }
 
 sub flush_jobs {
@@ -173,7 +174,7 @@ sub flush_jobs {
 }
 
 sub run_game_wrapped {
-    my($shell, $extra_settings) = @_;
+    my($shell, $extra_settings, $preskip) = @_;
     my $logfile = $MOD_DIR . $LOG . '.log';
     if (-e $logfile) {
         unlink $logfile;
@@ -192,7 +193,7 @@ sub run_game_wrapped {
         $line = <$log>;
         if (defined $line && $line =~ /\R$/) {
             $line = filter($line);
-            process($line, \$started, \$stopped, \$needs_poll);
+            process($line, \$started, \$stopped, \$needs_poll, $preskip);
         } else {
             seek $log, $pos, 0;
         }
@@ -228,10 +229,6 @@ sub run_game {
 
 sub create_video {
     my @files = get_files();
-    for my $i (0 .. $#files - $skip) {
-        move($files[$i + $skip], $files[$i]);
-    }
-    @files = get_files();
     if ($end > 0) {
         my $wanted = $fps * ($end - $start);
         if ($wanted < @files) {
@@ -241,6 +238,10 @@ sub create_video {
             }
         }
     }
+    for my $i (0 .. $#files - $skip) {
+        move($files[$i + $skip], $files[$i]);
+    }
+    splice @files, @files - $skip;
     system 'ffmpeg -r ' . $fps . ' ' . $video_settings
         . ' -i ' . $AVI_DIR . 'avi%06d.jpg '
         . ($audio ? '-i ' . $AVI_DIR . $AUDIO . ' -acodec libmp3lame ' : '')
@@ -264,14 +265,18 @@ sub filter {
 }
 
 sub process {
-    my($line, $started, $stopped, $needs_poll) = @_;
+    my($line, $started, $stopped, $needs_poll, $preskip) = @_;
     if (${$stopped}) {
         return;
     }
     if ($line =~ /"demotime" is "(\d+)"/) {
         if (!${$started}) {
             issue_command('pause');
-            issue_command('jump');
+            if ($preskip) {
+                issue_command('jump-preskip');
+            } else {
+                issue_command('jump');
+            }
             issue_command('pause');
             issue_command('start');
             ${$started} = 1;
