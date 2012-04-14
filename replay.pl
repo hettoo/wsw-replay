@@ -22,6 +22,7 @@ my $audio = 0;
 my $game_cmd = '/usr/bin/warsow';
 my $game_dir = $ENV{'HOME'} . '/.warsow-0.6/';
 my $mod = 'basewsw';
+my $player = 0;
 my $game_settings = '';
 my $video_settings = '';
 my $skip = 0;
@@ -46,6 +47,7 @@ sub get_options {
         'game=s' => \$game_cmd,
         'dir=s' => \$game_dir,
         'mod=s' => \$mod,
+        'player=i' => \$player,
         'game-settings=s' => \$game_settings,
         'video-settings=s' => \$video_settings,
         'skip=i' => \$skip,
@@ -73,6 +75,7 @@ sub help {
     say '  --dir=DIR                   set the game directory (for this user)'
         . ' to DIR';
     say '  --mod=MOD                   set the game mod to MOD';
+    say '  --player=NUMBER             skips NUMBER players before recording';
     say '  --game-settings=SETTINGS    set additional game settings SETTINGS';
     say '  --video-settings=SETTINGS   set additional ffmpeg settings SETTINGS';
     say '  --skip=FRAMES               remove the first FRAMES frames';
@@ -97,10 +100,11 @@ sub set_constants {
     $BINDS_SCRIPT = $NAME . '-binds.cfg';
     %COMMANDS = (
         'pause' => ['demopause', 'h'],
-        'jump' => , ['demojump ' . $start, 'i'],
-        'jump-preskip' => , ['demojump ' . ($start + $skip / $fps), 'j'],
-        'start' => ['demoavi', 'l'],
-        'poll' => ['exec ' . $POLL_SCRIPT . ' silent', 'm'],
+        'jump' => ['demojump ' . $start, 'i'],
+        'jump-preskip' => ['demojump ' . ($start + $skip / $fps), 'j'],
+        'next' => ['weapnext', 'l'],
+        'start' => ['demoavi', 'm'],
+        'poll' => ['exec ' . $POLL_SCRIPT . ' silent', 'n'],
         'stop' => ['quit', 'o']
     );
     @DEPENDENCIES = ($game_cmd, 'xinit', 'xdotool', 'ffmpeg');
@@ -282,6 +286,9 @@ sub process {
                 issue_command('jump-preskip');
             } else {
                 issue_command('jump');
+            }
+            for (1 .. $player) {
+                issue_command('next');
             }
             issue_command('pause');
             issue_command('start');
