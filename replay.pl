@@ -10,11 +10,13 @@ use POSIX 'ceil';
 use Time::HiRes 'time';
 use File::Copy;
 
+# Global 'constants'
 my(
     $NAME, $MOD_DIR, $AVI_DIR, $LOG, $POLL_DELAY, $CONSOLE_HEIGHT,
     $VIDEO, $AUDIO, $POLL_SCRIPT, $BINDS_SCRIPT, %COMMANDS, @DEPENDENCIES
 );
 
+# Options
 my $demo;
 my $start = 0;
 my $end = 0;
@@ -31,14 +33,17 @@ my $width = 1280;
 my $height = 720;
 my $display = 1;
 
+# Other global variables
 my $shell;
 
+# Main program
 get_options();
 set_constants();
 test_dependencies();
-run();
+replay();
 exit;
 
+# Processes command line input.
 sub get_options {
     GetOptions(
         'start=f' => \$start,
@@ -64,6 +69,7 @@ sub get_options {
     }
 }
 
+# Display a help screen and exit.
 sub help {
     say 'Usage: ' . $0 . ' [OPTION]... demo';
     say 'Render a Warsow game demo.';
@@ -87,6 +93,7 @@ sub help {
     exit;
 }
 
+# Initializes the 'constants'.
 sub set_constants {
     $NAME = 'replay';
     $MOD_DIR = $game_dir . $mod . '/';
@@ -110,6 +117,7 @@ sub set_constants {
     @DEPENDENCIES = ($game_cmd, 'xinit', 'xdotool', 'ffmpeg');
 }
 
+# Tests if all dependencies are available.
 sub test_dependencies {
     my $fail = '';
     for my $dependency (@DEPENDENCIES) {
@@ -123,16 +131,17 @@ sub test_dependencies {
     }
 }
 
-sub run {
+# Converts the demo to a video.
+sub replay {
     open $shell, '|-', 'bash';
     $shell->autoflush(1);
     check_old_files();
     create_binds_script();
     create_poll_script();
-    get_images();
+    render_images();
     if ($audio) {
         flush_jobs();
-        get_audio();
+        render_audio();
     }
     close $shell;
     unlink $MOD_DIR . $POLL_SCRIPT;
@@ -140,13 +149,15 @@ sub run {
     create_video();
 }
 
+# Checks if there is no old footage present.
 sub check_old_files {
-    my @files = get_files();
-    if (@files > 0 || -e $AVI_DIR . $VIDEO || -e $AVI_DIR . $AUDIO) {
+    my @images = get_images();
+    if (@images > 0 || -e $AVI_DIR . $VIDEO || -e $AVI_DIR . $AUDIO) {
         die "Old footage present\n";
     }
 }
 
+# Creates a .cfg file containing the needed keybinds.
 sub create_binds_script {
     my $binds = '';
     for my $cmd (keys %COMMANDS) {
@@ -158,26 +169,32 @@ sub create_binds_script {
     close $out;
 }
 
+# Creates a .cfg file for polling the demotime.
 sub create_poll_script {
     open my $out, '>', $MOD_DIR . $POLL_SCRIPT;
     print $out 'demotime' . (';echo' x $CONSOLE_HEIGHT);
     close $out;
 }
 
-sub get_images {
+# Renders the video images.
+sub render_images {
     run_game_wrapped('+set cl_demoavi_video 1 +set cl_demoavi_audio 0'
         . ' +set r_screenshot_jpeg 1', 0);
 }
 
-sub get_audio {
+# Renders the video audio.
+sub render_audio {
     run_game_wrapped('+set cl_demoavi_video 0 +set cl_demoavi_audio 1'
         . ' +set s_module 1', 1);
 }
 
+# Makes sure all jobs have ended before new commands are executed on the shell.
 sub flush_jobs {
     say $shell 'while kill `jobs -p` &>/dev/null; do true; done';
 }
 
+# Runs the game and communicates with it to make it record the needed parts and
+# exit.
 sub run_game_wrapped {
     my($extra_settings, $preskip) = @_;
     my $logfile = $MOD_DIR . $LOG . '.log';
@@ -218,6 +235,7 @@ sub run_game_wrapped {
     say $shell 'kill `jobs -p`';
 }
 
+# Runs the game.
 sub run_game {
     my($extra_settings) = @_;
     my $arguments = ' +set fs_game ' . $mod
@@ -236,34 +254,37 @@ sub run_game {
         . ' &>/dev/null &';
 }
 
+# Turns the generated footage into one video file and removes the intermediate
+# files.
 sub create_video {
-    my @files = get_files();
+    my @images = get_images();
     if ($end > 0) {
         my $wanted = $fps * ($end - $start);
-        if ($wanted < @files) {
-            my @removed = splice @files, ceil($wanted);
+        if ($wanted < @images) {
+            my @removed = splice @images, ceil($wanted);
             for my $removed (@removed) {
                 unlink $removed;
             }
         }
     }
-    for my $i (0 .. $#files - $skip) {
-        move($files[$i + $skip], $files[$i]);
+    for my $i (0 .. $#images - $skip) {
+        move($images[$i + $skip], $images[$i]);
     }
-    splice @files, @files - $skip;
+    splice @images, @images - $skip;
     system 'ffmpeg -r ' . $fps
         . ' -i ' . $AVI_DIR . 'avi%06d.jpg'
         . ($audio ? ' -i ' . $AVI_DIR . $AUDIO . ' -acodec libmp3lame' : '')
         . ' ' . $video_settings
         . ' ' . $AVI_DIR . $VIDEO;
-    for my $file (@files) {
-        unlink $file;
+    for my $image (@images) {
+        unlink $image;
     }
     if ($audio) {
         unlink $AVI_DIR . $AUDIO;
     }
 }
 
+# Filters a string from colortokens and chomps it.
 sub filter {
     my($arg) = @_;
     if (!defined $arg) {
@@ -274,6 +295,7 @@ sub filter {
     return $arg;
 }
 
+# Acts on an input line from the game.
 sub process {
     my($line, $started, $stopped, $needs_poll, $preskip) = @_;
     if (${$stopped}) {
@@ -306,11 +328,12 @@ sub process {
     }
 }
 
+# Makes the game execute a predefined command.
 sub issue_command {
     my($command) = @_;
     system 'DISPLAY=:' . $display . ' xdotool key ' . $COMMANDS{$command}->[1];
 }
 
-sub get_files {
+sub get_images {
     return glob $AVI_DIR . '*.jpg';
 }
