@@ -334,6 +334,7 @@ sub issue_command {
     system 'DISPLAY=:' . $display . ' xdotool key ' . $COMMANDS{$command}->[1];
 }
 
+# Returns an array of Warsow-generated demo image files.
 sub get_images {
     return glob $AVI_DIR . '*.jpg';
 }
