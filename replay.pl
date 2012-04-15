@@ -32,6 +32,7 @@ my $fps = 50;
 my $width = 1280;
 my $height = 720;
 my $display = 1;
+my $output;
 
 # Other global variables
 my $shell;
@@ -60,6 +61,7 @@ sub get_options {
         'width=i' => \$width,
         'height=i' => \$height,
         'display=i' => \$display,
+        'output=s' => \$output,
         'help' => \&help
     );
     if (@ARGV == 1) {
@@ -89,6 +91,7 @@ sub help {
     say '  --width=PIXELS              render with a width of PIXELS';
     say '  --height=PIXELS             render with a height of PIXELS';
     say '  --display=DISPLAY           use X display DISPLAY';
+    say '  --output=FILE               move the final video to FILE';
     say '  --help                      display this help and exit';
     exit;
 }
@@ -282,6 +285,9 @@ sub create_video {
     }
     if ($audio) {
         unlink $AVI_DIR . $AUDIO;
+    }
+    if (defined $output) {
+        move($AVI_DIR . $VIDEO, $output);
     }
 }
 
