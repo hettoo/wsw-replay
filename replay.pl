@@ -272,6 +272,7 @@ sub create_video {
     }
     splice @images, @images - $skip;
     system 'ffmpeg -r ' . $fps
+        . ($end > 0 ? ' -t ' . ($end - $start) : '')
         . ' -i ' . $AVI_DIR . 'avi%06d.jpg'
         . ($audio ? ' -i ' . $AVI_DIR . $AUDIO . ' -acodec libmp3lame' : '')
         . ' ' . $video_settings
