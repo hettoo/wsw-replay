@@ -32,6 +32,7 @@ my $fps = 50;
 my $width = 1280;
 my $height = 720;
 my $display = 1;
+my $thumbnail;
 my $output;
 
 # Other global variables
@@ -61,6 +62,7 @@ sub get_options {
         'width=i' => \$width,
         'height=i' => \$height,
         'display=i' => \$display,
+        'thumbnail=s' => \$thumbnail,
         'output=s' => \$output,
         'help' => \&help
     );
@@ -73,7 +75,7 @@ sub get_options {
 
 # Display a help screen and exit.
 sub help {
-    say 'Usage: ' . $0 . ' [OPTION]... demo';
+    say 'Usage: ' . $0 . ' [OPTION]... DEMO';
     say 'Render a Warsow game demo.';
     say '';
     say '  --start=SECOND              start at second SECOND';
@@ -91,6 +93,7 @@ sub help {
     say '  --width=PIXELS              render with a width of PIXELS';
     say '  --height=PIXELS             render with a height of PIXELS';
     say '  --display=DISPLAY           use X display DISPLAY';
+    say '  --thumbnail=FILE            save a thumbnail as FILE';
     say '  --output=FILE               move the final video to FILE';
     say '  --help                      display this help and exit';
     exit;
@@ -274,20 +277,25 @@ sub create_video {
         move($images[$i + $skip], $images[$i]);
     }
     splice @images, @images - $skip;
-    system 'ffmpeg -r ' . $fps
+    if (@images > 0) {
+        system 'ffmpeg -r ' . $fps
         . ($end > 0 ? ' -t ' . ($end - $start) : '')
         . ' -i ' . $AVI_DIR . 'avi%06d.jpg'
         . ($audio ? ' -i ' . $AVI_DIR . $AUDIO . ' -acodec libmp3lame' : '')
         . ' ' . $video_settings
         . ' ' . $AVI_DIR . $VIDEO;
+        if (defined $output) {
+            move($AVI_DIR . $VIDEO, $output);
+        }
+        if (defined $thumbnail) {
+            copy($images[int @images / 2], $thumbnail);
+        }
+    }
     for my $image (@images) {
         unlink $image;
     }
-    if ($audio) {
+    if ($audio && -e $AVI_DIR . $AUDIO) {
         unlink $AVI_DIR . $AUDIO;
-    }
-    if (defined $output) {
-        move($AVI_DIR . $VIDEO, $output);
     }
 }
 
