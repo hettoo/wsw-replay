@@ -24,7 +24,7 @@ my $audio = 0;
 my $game_cmd = '/usr/bin/warsow';
 my $game_dir = $ENV{'HOME'} . '/.warsow-0.6/';
 my $mod = 'basewsw';
-my $x = 'X';
+my $x_cmd = 'X';
 my $player = 0;
 my $game_settings = '';
 my $video_settings = '';
@@ -56,7 +56,7 @@ sub get_options {
         'game=s' => \$game_cmd,
         'dir=s' => \$game_dir,
         'mod=s' => \$mod,
-        'x=s' => \$x,
+        'x=s' => \$x_cmd,
         'player=i' => \$player,
         'game-settings=s' => \$game_settings,
         'video-settings=s' => \$video_settings,
@@ -124,7 +124,7 @@ sub set_constants {
         'poll' => ['exec ' . $POLL_SCRIPT . ' silent', 'n'],
         'stop' => ['quit', 'o']
     );
-    @DEPENDENCIES = ($game_cmd, 'xinit', 'xdotool', 'ffmpeg');
+    @DEPENDENCIES = ($game_cmd, $x_cmd, 'xdotool', 'ffmpeg');
 }
 
 # Tests if all dependencies are available.
@@ -197,7 +197,7 @@ sub create_poll_script {
 
 # Starts the X server.
 sub start_x {
-    say $xshell $x . ' :' . $display . ' &>/dev/null &';
+    say $xshell $x_cmd . ' :' . $display . ' &>/dev/null &';
 }
 
 # Renders the video images.
