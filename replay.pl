@@ -120,7 +120,7 @@ sub set_constants {
         'poll' => ['exec ' . $POLL_SCRIPT . ' silent', 'n'],
         'stop' => ['quit', 'o']
     );
-    @DEPENDENCIES = ($game_cmd, $x_cmd, 'xdotool', 'ffmpeg');
+    @DEPENDENCIES = ($game_cmd, 'xinit', 'xdotool', 'ffmpeg');
 }
 
 # Tests if all dependencies are available.
