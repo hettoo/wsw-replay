@@ -24,7 +24,10 @@ my $audio = 0;
 my $game_cmd = '/usr/bin/warsow';
 my $game_dir = $ENV{'HOME'} . '/.warsow-0.6/';
 my $mod = 'basewsw';
+<<<<<<< HEAD
 my $x_cmd = 'X';
+=======
+>>>>>>> parent of 18b1822... Enabled a variable X server command
 my $player = 0;
 my $game_settings = '';
 my $video_settings = '';
@@ -38,7 +41,6 @@ my $output;
 
 # Other global variables
 my $shell;
-my $xshell;
 
 # Main program
 get_options();
@@ -56,7 +58,10 @@ sub get_options {
         'game=s' => \$game_cmd,
         'dir=s' => \$game_dir,
         'mod=s' => \$mod,
+<<<<<<< HEAD
         'x=s' => \$x_cmd,
+=======
+>>>>>>> parent of 18b1822... Enabled a variable X server command
         'player=i' => \$player,
         'game-settings=s' => \$game_settings,
         'video-settings=s' => \$video_settings,
@@ -88,7 +93,6 @@ sub help {
     say '  --dir=DIR                   set the game directory (for this user)'
         . ' to DIR';
     say '  --mod=MOD                   set the game mod to MOD';
-    say '  --x=COMMAND                 use COMMAND as the X server command';
     say '  --player=NUMBER             skips NUMBER players before recording';
     say '  --game-settings=SETTINGS    set additional game settings SETTINGS';
     say '  --video-settings=SETTINGS   set additional ffmpeg settings SETTINGS';
@@ -143,29 +147,20 @@ sub test_dependencies {
 
 # Converts the demo to a video.
 sub replay {
-    create_shell(\$shell);
-    create_shell(\$xshell);
+    open $shell, '|-', 'bash';
+    $shell->autoflush(1);
     check_old_files();
     create_binds_script();
     create_poll_script();
-    start_x();
     render_images();
     if ($audio) {
-        flush_shell($shell);
+        flush_jobs();
         render_audio();
     }
-    close_shell($shell);
-    close_shell($xshell);
+    close $shell;
     unlink $MOD_DIR . $POLL_SCRIPT;
     unlink $MOD_DIR . $BINDS_SCRIPT;
     create_video();
-}
-
-# Creates a shell for inputting command sequences.
-sub create_shell {
-    my($shell) = @_;
-    open $$shell, '|-', 'bash';
-    $$shell->autoflush(1);
 }
 
 # Checks if there is no old footage present.
@@ -195,11 +190,14 @@ sub create_poll_script {
     close $out;
 }
 
+<<<<<<< HEAD
 # Starts the X server.
 sub start_x {
     say $xshell $x_cmd . ' :' . $display . ' &>/dev/null &';
 }
 
+=======
+>>>>>>> parent of 18b1822... Enabled a variable X server command
 # Renders the video images.
 sub render_images {
     run_game_wrapped('+set cl_demoavi_video 1 +set cl_demoavi_audio 0'
@@ -213,16 +211,8 @@ sub render_audio {
 }
 
 # Makes sure all jobs have ended before new commands are executed on the shell.
-sub flush_shell {
-    my($shell) = @_;
+sub flush_jobs {
     say $shell 'while kill `jobs -p` &>/dev/null; do true; done';
-}
-
-# Closes a shell.
-sub close_shell {
-    my($shell) = @_;
-    flush_shell($shell);
-    close $shell;
 }
 
 # Runs the game and communicates with it to make it record the needed parts and
@@ -248,8 +238,7 @@ sub run_game_wrapped {
             $line = filter($line);
             if ($line =~ /^error: (.+)/i
                 || $line =~ /(no valid demo file found)/i) {
-                close_shell($shell);
-                close_shell($xshell);
+                flush_jobs();
                 die "Warsow error: $1\n";
             }
             process($line, \$started, \$stopped, \$needs_poll, $preskip);
@@ -283,7 +272,7 @@ sub run_game {
         . ' ' . $extra_settings
         . ' ' . $game_settings
         . ' +demo "' . $demo . '"';
-    say $shell 'DISPLAY=:' . $display . ' ' . $game_cmd . $arguments
+    say $shell 'xinit ' . $game_cmd . $arguments . ' -- :' . $display
         . ' &>/dev/null &';
 }
 
