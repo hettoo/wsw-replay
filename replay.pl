@@ -24,6 +24,7 @@ my $audio = 0;
 my $game_cmd = '/usr/bin/warsow';
 my $game_dir = $ENV{'HOME'} . '/.warsow-0.6/';
 my $mod = 'basewsw';
+my $x_cmd = 'X';
 my $player = 0;
 my $game_settings = '';
 my $video_settings = '';
@@ -59,6 +60,7 @@ sub get_options {
         'game=s' => \$game_cmd,
         'dir=s' => \$game_dir,
         'mod=s' => \$mod,
+        'x=s' => \$x_cmd,
         'player=i' => \$player,
         'game-settings=s' => \$game_settings,
         'video-settings=s' => \$video_settings,
@@ -87,9 +89,9 @@ sub help {
     say '  --end=SECOND                end at second SECOND';
     say '  --audio                     also render audio';
     say '  --game=COMMAND              set the game executable to COMMAND';
-    say '  --dir=DIR                   set the game directory (for this user)'
-        . ' to DIR';
+    say '  --dir=DIR                   set the personal game directory to DIR';
     say '  --mod=MOD                   set the game mod to MOD';
+    say '  --x=COMMAND                 set the X server exacutable to COMMAND';
     say '  --player=NUMBER             skips NUMBER players before recording';
     say '  --game-settings=SETTINGS    set additional game settings SETTINGS';
     say '  --video-settings=SETTINGS   set additional ffmpeg settings SETTINGS';
@@ -125,7 +127,7 @@ sub set_constants {
         'poll' => ['exec ' . $POLL_SCRIPT . ' silent', 'n'],
         'stop' => ['quit', 'o']
     );
-    @DEPENDENCIES = ($game_cmd, 'xinit', 'xdotool', 'ffmpeg');
+    @DEPENDENCIES = ($game_cmd, 'xinit', $x_cmd, 'xdotool', 'ffmpeg');
 }
 
 # Tests if all dependencies are available.
@@ -273,8 +275,8 @@ sub run_game {
         . ' ' . $extra_settings
         . ' ' . $game_settings
         . ' +demo "' . $demo . '"';
-    say $shell 'xinit ' . $game_cmd . $arguments . ' -- :' . $display
-        . ' &>/dev/null &';
+    say $shell 'xinit ' . $game_cmd . $arguments . ' -- `which ' . $x_cmd
+        . '` :' . $display . ' &>/dev/null &';
 }
 
 # Turns the generated footage into one video file and removes the intermediate
