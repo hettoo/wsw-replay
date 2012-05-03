@@ -24,10 +24,6 @@ my $audio = 0;
 my $game_cmd = '/usr/bin/warsow';
 my $game_dir = $ENV{'HOME'} . '/.warsow-0.6/';
 my $mod = 'basewsw';
-<<<<<<< HEAD
-my $x_cmd = 'X';
-=======
->>>>>>> parent of 18b1822... Enabled a variable X server command
 my $player = 0;
 my $game_settings = '';
 my $video_settings = '';
@@ -58,10 +54,6 @@ sub get_options {
         'game=s' => \$game_cmd,
         'dir=s' => \$game_dir,
         'mod=s' => \$mod,
-<<<<<<< HEAD
-        'x=s' => \$x_cmd,
-=======
->>>>>>> parent of 18b1822... Enabled a variable X server command
         'player=i' => \$player,
         'game-settings=s' => \$game_settings,
         'video-settings=s' => \$video_settings,
@@ -190,14 +182,6 @@ sub create_poll_script {
     close $out;
 }
 
-<<<<<<< HEAD
-# Starts the X server.
-sub start_x {
-    say $xshell $x_cmd . ' :' . $display . ' &>/dev/null &';
-}
-
-=======
->>>>>>> parent of 18b1822... Enabled a variable X server command
 # Renders the video images.
 sub render_images {
     run_game_wrapped('+set cl_demoavi_video 1 +set cl_demoavi_audio 0'
