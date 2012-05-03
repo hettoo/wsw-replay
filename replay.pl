@@ -219,7 +219,7 @@ sub close_shell {
 }
 
 # Runs the game and communicates with it to make it record the needed parts and
-# exit.
+# exit. It might still be running if the complete demo was recorded though.
 sub run_game_wrapped {
     my($extra_settings, $preskip) = @_;
     my $logfile = $MOD_DIR . $LOG . '.log';
@@ -256,7 +256,6 @@ sub run_game_wrapped {
         }
     } while (!defined $line || $line ne 'Demo completed');
     close $log;
-    say $shell 'kill `jobs -p`';
 }
 
 # Runs the game.
