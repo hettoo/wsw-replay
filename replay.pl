@@ -38,6 +38,11 @@ my $output;
 # Other global variables
 my $shell;
 
+# Termination handler
+END {
+    close_shell();
+}
+
 # Main program
 get_options();
 set_constants();
@@ -139,20 +144,25 @@ sub test_dependencies {
 
 # Converts the demo to a video.
 sub replay {
-    open $shell, '|-', 'bash';
-    $shell->autoflush(1);
+    open_shell();
     check_old_files();
     create_binds_script();
     create_poll_script();
     render_images();
     if ($audio) {
-        flush_jobs();
+        flush_shell();
         render_audio();
     }
-    close $shell;
+    close_shell();
     unlink $MOD_DIR . $POLL_SCRIPT;
     unlink $MOD_DIR . $BINDS_SCRIPT;
     create_video();
+}
+
+# Opens a bash shell ready to accept commands.
+sub open_shell {
+    open $shell, '|-', 'bash';
+    $shell->autoflush(1);
 }
 
 # Checks if there is no old footage present.
@@ -195,8 +205,17 @@ sub render_audio {
 }
 
 # Makes sure all jobs have ended before new commands are executed on the shell.
-sub flush_jobs {
+sub flush_shell {
     say $shell 'while kill `jobs -p` &>/dev/null; do true; done';
+}
+
+# Closes the shell.
+sub close_shell {
+    if (defined $shell) {
+        flush_shell();
+        close $shell;
+        $shell = undef;
+    }
 }
 
 # Runs the game and communicates with it to make it record the needed parts and
@@ -222,7 +241,6 @@ sub run_game_wrapped {
             $line = filter($line);
             if ($line =~ /^error: (.+)/i
                 || $line =~ /(no valid demo file found)/i) {
-                flush_jobs();
                 die "Warsow error: $1\n";
             }
             process($line, \$started, \$stopped, \$needs_poll, $preskip);
