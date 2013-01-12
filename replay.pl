@@ -12,8 +12,8 @@ use File::Copy;
 
 # Global 'constants'
 my(
-    $NAME, $MOD_DIR, $AVI_DIR, $LOG, $POLL_DELAY, $CONSOLE_HEIGHT,
-    $VIDEO, $AUDIO, $POLL_SCRIPT, $BINDS_SCRIPT, %COMMANDS, @DEPENDENCIES
+    $NAME, $MOD_DIR, $AVI_DIR, $LOG, $CONSOLE_HEIGHT,
+    $VIDEO, $AUDIO, $BINDS_SCRIPT, %COMMANDS, @DEPENDENCIES
 );
 
 # Options
@@ -22,7 +22,7 @@ my $start = 0;
 my $end = 0;
 my $audio = 0;
 my $game_cmd = '/usr/bin/warsow';
-my $game_dir = $ENV{'HOME'} . '/.warsow-0.6/';
+my $game_dir = $ENV{'HOME'} . '/.warsow-1.0/';
 my $mod = 'basewsw';
 my $x_cmd = 'X';
 my $player = 0;
@@ -112,11 +112,9 @@ sub set_constants {
     $MOD_DIR = $game_dir . $mod . '/';
     $AVI_DIR = $MOD_DIR . 'avi/';
     $LOG = $NAME;
-    $POLL_DELAY = 0.5;
     $CONSOLE_HEIGHT = 4;
     $VIDEO = 'demo.mp4';
     $AUDIO = 'wavdump.wav';
-    $POLL_SCRIPT = $NAME . '-poll.cfg';
     $BINDS_SCRIPT = $NAME . '-binds.cfg';
     %COMMANDS = (
         'pause' => ['demopause', 'h'],
@@ -124,7 +122,6 @@ sub set_constants {
         'jump-preskip' => ['demojump ' . ($start + $skip / $fps), 'j'],
         'next' => ['weapnext', 'l'],
         'start' => ['demoavi', 'm'],
-        'poll' => ['exec ' . $POLL_SCRIPT . ' silent', 'n'],
         'stop' => ['quit', 'o']
     );
     @DEPENDENCIES = ($game_cmd, 'xinit', $x_cmd, 'xdotool', 'ffmpeg');
@@ -149,14 +146,12 @@ sub replay {
     open_shell();
     check_old_files();
     create_binds_script();
-    create_poll_script();
     render_images();
     if ($audio) {
         flush_shell();
         render_audio();
     }
     close_shell();
-    unlink $MOD_DIR . $POLL_SCRIPT;
     unlink $MOD_DIR . $BINDS_SCRIPT;
     create_video();
 }
@@ -184,13 +179,6 @@ sub create_binds_script {
     }
     open my $out, '>', $MOD_DIR . $BINDS_SCRIPT;
     print $out $binds;
-    close $out;
-}
-
-# Creates a .cfg file for polling the demotime.
-sub create_poll_script {
-    open my $out, '>', $MOD_DIR . $POLL_SCRIPT;
-    print $out 'demotime' . (';echo' x $CONSOLE_HEIGHT);
     close $out;
 }
 
@@ -232,8 +220,6 @@ sub run_game_wrapped {
     while (!-e $logfile) { }
     my $started = 0;
     my $stopped = 0;
-    my $needs_poll = 0;
-    my $poll_time = 0;
     open my $log, '<', $logfile;
     my $line;
     do {
@@ -245,17 +231,11 @@ sub run_game_wrapped {
                 || $line =~ /(no valid demo file found)/i) {
                 die "Warsow error: $1\n";
             }
-            process($line, \$started, \$stopped, \$needs_poll, $preskip);
+            process($line, \$started, \$stopped, $preskip);
         } else {
             seek $log, $pos, 0;
         }
-        if ($needs_poll) {
-            if (time >= $poll_time + $POLL_DELAY) {
-                issue_command('poll');
-                $poll_time = time;
-                $needs_poll = 0;
-            }
-        }
+        process(undef, \$started, \$stopped, $preskip);
     } while (!defined $line || $line ne 'Demo completed');
     close $log;
 }
@@ -331,34 +311,26 @@ sub filter {
 
 # Acts on an input line from the game.
 sub process {
-    my($line, $started, $stopped, $needs_poll, $preskip) = @_;
+    my($line, $started, $stopped, $preskip) = @_;
     if (${$stopped}) {
         return;
     }
-    if ($line =~ /"demotime" is "(\d+)"/) {
-        if (!${$started}) {
-            issue_command('pause');
-            if ($preskip) {
-                issue_command('jump-preskip');
-            } else {
-                issue_command('jump');
-            }
-            for (1 .. $player) {
-                issue_command('next');
-            }
-            issue_command('pause');
-            issue_command('start');
-            ${$started} = 1;
+    if (defined $line && $line =~ /^cam:/) {
+        issue_command('pause');
+        if ($preskip) {
+            issue_command('jump-preskip');
         } else {
-            if ($end > 0 && $1 >= $end) {
-                issue_command('stop');
-                ${$stopped} = 1;
-            } else {
-                ${$needs_poll} = 1;
-            }
+            issue_command('jump');
         }
-    } else {
-        ${$needs_poll} = 1;
+        for (1 .. $player) {
+            issue_command('next');
+        }
+        issue_command('pause');
+        issue_command('start');
+        ${$started} = time;
+    } elsif (${$started} && $end > 0 && time - ${$started} >= $end - $start) {
+        issue_command('stop');
+        ${$stopped} = 1;
     }
 }
 
