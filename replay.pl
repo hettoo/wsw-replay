@@ -244,7 +244,7 @@ sub run_game_wrapped {
 sub run_game {
     my($extra_settings) = @_;
     my $arguments = ' +set fs_game ' . $mod
-        . ' +set r_mode -1'
+        . ' +set vid_mode -1'
         . ' +set vid_customwidth ' . $width
         . ' +set vid_customheight ' . $height
         . ' +set cl_demoavi_fps ' . $fps
@@ -280,6 +280,7 @@ sub create_video {
         system 'ffmpeg -r ' . $fps
         . ($end > 0 ? ' -t ' . ($end - $start) : '')
         . ' -i ' . $AVI_DIR . 'avi%06d.jpg'
+        . ' -preset slow -crf 22 -pix_fmt yuv420p'
         . ($audio ? ' -i ' . $AVI_DIR . $AUDIO . ' -acodec libmp3lame' : '')
         . ' ' . $video_settings
         . ' ' . $AVI_DIR . $VIDEO;
