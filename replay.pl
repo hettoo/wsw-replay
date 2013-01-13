@@ -280,8 +280,8 @@ sub create_video {
         system 'ffmpeg -r ' . $fps
         . ($end > 0 ? ' -t ' . ($end - $start) : '')
         . ' -i ' . $AVI_DIR . 'avi%06d.jpg'
-        . ' -preset slow -crf 22 -pix_fmt yuv420p'
-        . ($audio ? ' -i ' . $AVI_DIR . $AUDIO . ' -acodec libmp3lame' : '')
+        . ($audio ? ' -i ' . $AVI_DIR . $AUDIO . ' -c:a libmp3lame -q:a 3' : '')
+        . ' -c:v libx264 -preset slow -crf 22 -pix_fmt yuv420p'
         . ' ' . $video_settings
         . ' ' . $AVI_DIR . $VIDEO;
         if (defined $output) {
